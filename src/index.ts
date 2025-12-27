@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
@@ -7,6 +8,24 @@ import { getGitHubContributions } from "./github/api.js";
 import { generateAppHtml } from "./app/template.js";
 
 const app = new Hono();
+
+// Helper function to get API base URL from request headers
+function getApiBaseUrl(c: Context): string {
+	const host = c.req.header("x-forwarded-host") || c.req.header("host");
+	const forwardedProto = c.req.header("x-forwarded-proto");
+
+	if (host) {
+		// Use x-forwarded-proto if available (production behind proxy)
+		// Otherwise, detect if it's localhost/local dev and use http
+		const isLocalhost =
+			host.startsWith("localhost") || host.startsWith("127.0.0.1");
+		const protocol = forwardedProto || (isLocalhost ? "http" : "https");
+		return `${protocol}://${host}`;
+	}
+
+	// Fallback to request URL origin
+	return new URL(c.req.url).origin;
+}
 
 // Enable CORS for all routes
 app.use("*", cors());
@@ -28,7 +47,8 @@ function generateConnectionId(): string {
 
 // Home page - serve the app HTML
 app.get("/", (c) => {
-	const html = generateAppHtml();
+	const apiBaseUrl = getApiBaseUrl(c);
+	const html = generateAppHtml({ apiBaseUrl });
 	return c.html(html);
 });
 
@@ -116,9 +136,10 @@ app.post("/message", async (c) => {
 
 	try {
 		const body = await c.req.json();
+		const apiBaseUrl = getApiBaseUrl(c);
 
 		// Process the MCP message
-		const response = await processMessage(mcpServer, body);
+		const response = await processMessage(mcpServer, body, apiBaseUrl);
 
 		// Send response via SSE
 		connection.send(JSON.stringify(response));
@@ -135,6 +156,7 @@ app.post("/message", async (c) => {
 async function processMessage(
 	_server: ReturnType<typeof createMCPServer>,
 	message: Record<string, unknown>,
+	apiBaseUrl: string,
 ): Promise<Record<string, unknown>> {
 	const method = message.method as string;
 	const id = message.id as string | number | undefined;
@@ -199,7 +221,10 @@ async function processMessage(
 
 		if (toolName === "github_contributions") {
 			const username = toolArgs.username as string | undefined;
-			const html = generateAppHtml(username);
+			const html = generateAppHtml({
+				initialUsername: username,
+				apiBaseUrl,
+			});
 
 			return {
 				jsonrpc: "2.0",

@@ -1,7 +1,18 @@
 import { getStyles } from "./styles.js";
 
-export function generateAppHtml(initialUsername?: string): string {
+export interface GenerateAppHtmlOptions {
+	initialUsername?: string;
+	apiBaseUrl?: string;
+}
+
+export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
+	const { initialUsername, apiBaseUrl } = options;
 	const styles = getStyles();
+
+	// Use the provided apiBaseUrl or fall back to window.location.origin
+	const apiBaseScript = apiBaseUrl
+		? `const API_BASE = '${apiBaseUrl}';`
+		: `const API_BASE = window.location.origin;`;
 
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -91,8 +102,8 @@ export function generateAppHtml(initialUsername?: string): string {
       const resizeObserver = new ResizeObserver(notifyResize);
       resizeObserver.observe(document.body);
 
-      // API endpoint
-      const API_BASE = window.location.origin;
+      // API endpoint (injected from server or fallback to window.location.origin)
+      ${apiBaseScript}
 
       // DOM elements
       const form = document.getElementById('searchForm');

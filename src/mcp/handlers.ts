@@ -2,10 +2,19 @@ import type { GitHubContributionsInput } from "./tools.js";
 import { generateAppHtml } from "../app/template.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
+export interface HandleToolOptions {
+	input: GitHubContributionsInput;
+	apiBaseUrl?: string;
+}
+
 export function handleGitHubContributionsTool(
-	input: GitHubContributionsInput,
+	options: HandleToolOptions,
 ): CallToolResult {
-	const html = generateAppHtml(input.username);
+	const { input, apiBaseUrl } = options;
+	const html = generateAppHtml({
+		initialUsername: input.username,
+		apiBaseUrl,
+	});
 
 	return {
 		content: [

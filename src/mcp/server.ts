@@ -50,7 +50,7 @@ export function createMCPServer(): Server {
 				};
 			}
 
-			return handleGitHubContributionsTool(parsed.data);
+			return handleGitHubContributionsTool({ input: parsed.data });
 		}
 
 		return {
