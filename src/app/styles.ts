@@ -293,7 +293,6 @@ export const getStyles = (): string => `
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: 20px;
-    overflow-x: auto;
   }
 
   .contributions-header {
@@ -314,14 +313,77 @@ export const getStyles = (): string => `
     color: var(--text-secondary);
   }
 
-  .contributions-graph {
-    overflow-x: auto;
-    padding-bottom: 8px;
+  .year-section {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    overflow: hidden;
+    background: var(--bg-primary);
   }
 
-  .contributions-graph svg {
+  .year-section:last-of-type {
+    margin-bottom: 0;
+  }
+
+  .year-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast);
+  }
+
+  .year-header:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .year-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .year-chevron {
+    transition: transform var(--transition-normal);
+    color: var(--text-muted);
+  }
+
+  .year-section.collapsed .year-chevron {
+    transform: rotate(-90deg);
+  }
+
+  .year-total {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .year-content {
+    max-height: 150px;
+    overflow: hidden;
+    transition: max-height var(--transition-normal) ease-out, padding var(--transition-normal) ease-out;
+    padding: 0 16px 16px;
+  }
+
+  .year-section.collapsed .year-content {
+    max-height: 0;
+    padding: 0 16px;
+  }
+
+  .contributions-graph {
+    width: 100%;
+  }
+
+  .contributions-graph svg,
+  .contribution-svg {
     display: block;
-    min-width: 720px;
+    width: 100%;
+    height: auto;
   }
 
   .contribution-cell {
@@ -444,4 +506,4 @@ export const getStyles = (): string => `
   .fade-in {
     animation: fadeIn 0.3s ease-out forwards;
   }
-`
+`;

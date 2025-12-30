@@ -175,36 +175,86 @@ export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
       }
 
       function renderContributionsSection(contributions) {
-        const svg = generateContributionsSVG(contributions.weeks);
-        return '<div class="contributions-section fade-in" style="animation-delay: 0.2s;">' +
+        // Group weeks by year
+        const yearGroups = groupWeeksByYear(contributions.weeks);
+        const years = Object.keys(yearGroups).sort((a, b) => Number(b) - Number(a)); // Sort descending (newest first)
+
+        let html = '<div class="contributions-section fade-in" style="animation-delay: 0.2s;">' +
           '<div class="contributions-header">' +
             '<span class="contributions-title">Contribution Activity</span>' +
-            '<span class="contributions-total">' + formatNumber(contributions.totalContributions) + ' contributions in the last year</span>' +
-          '</div>' +
-          '<div class="contributions-graph">' + svg + '</div>' +
-          '<div class="legend">' +
-            '<span>Less</span>' +
-            '<div class="legend-cell" style="background: var(--contribution-0);"></div>' +
-            '<div class="legend-cell" style="background: var(--contribution-1);"></div>' +
-            '<div class="legend-cell" style="background: var(--contribution-2);"></div>' +
-            '<div class="legend-cell" style="background: var(--contribution-3);"></div>' +
-            '<div class="legend-cell" style="background: var(--contribution-4);"></div>' +
-            '<span>More</span>' +
-          '</div>' +
+            '<span class="contributions-total">' + formatNumber(contributions.totalContributions) + ' contributions total</span>' +
+          '</div>';
+
+        // Render each year
+        years.forEach(function(year, index) {
+          const yearData = yearGroups[year];
+          const yearContributions = yearData.weeks.reduce(function(sum, week) {
+            return sum + week.contributionDays.reduce(function(s, d) { return s + d.count; }, 0);
+          }, 0);
+
+          html += '<div class="year-section' + (index > 0 ? ' collapsed' : '') + '" data-year="' + year + '">' +
+            '<div class="year-header" onclick="toggleYear(this)">' +
+              '<span class="year-title">' +
+                '<svg class="year-chevron" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">' +
+                  '<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"/>' +
+                '</svg>' +
+                year +
+              '</span>' +
+              '<span class="year-total">' + formatNumber(yearContributions) + ' contributions</span>' +
+            '</div>' +
+            '<div class="year-content">' +
+              '<div class="contributions-graph">' + generateContributionsSVG(yearData.weeks) + '</div>' +
+            '</div>' +
+          '</div>';
+        });
+
+        // Legend (only once at the bottom)
+        html += '<div class="legend">' +
+          '<span>Less</span>' +
+          '<div class="legend-cell" style="background: var(--contribution-0);"></div>' +
+          '<div class="legend-cell" style="background: var(--contribution-1);"></div>' +
+          '<div class="legend-cell" style="background: var(--contribution-2);"></div>' +
+          '<div class="legend-cell" style="background: var(--contribution-3);"></div>' +
+          '<div class="legend-cell" style="background: var(--contribution-4);"></div>' +
+          '<span>More</span>' +
         '</div>';
+
+        html += '</div>';
+        return html;
+      }
+
+      function groupWeeksByYear(weeks) {
+        if (!weeks || weeks.length === 0) return {};
+
+        const yearGroups = {};
+
+        weeks.forEach(function(week) {
+          if (!week.contributionDays || week.contributionDays.length === 0) return;
+
+          // Use the first day of the week to determine the year
+          const firstDay = week.contributionDays[0];
+          const year = new Date(firstDay.date).getFullYear().toString();
+
+          if (!yearGroups[year]) {
+            yearGroups[year] = { weeks: [] };
+          }
+          yearGroups[year].weeks.push(week);
+        });
+
+        return yearGroups;
       }
 
       function generateContributionsSVG(weeks) {
         if (!weeks || weeks.length === 0) return '';
 
-        const CELL_SIZE = 11;
+        const CELL_SIZE = 10;
         const CELL_GAP = 3;
         const WEEK_WIDTH = CELL_SIZE + CELL_GAP;
-        const MONTH_LABEL_HEIGHT = 20;
-        const DAY_LABEL_WIDTH = 30;
+        const MONTH_LABEL_HEIGHT = 18;
+        const DAY_LABEL_WIDTH = 28;
 
-        const svgWidth = weeks.length * WEEK_WIDTH + DAY_LABEL_WIDTH + 10;
-        const svgHeight = 7 * (CELL_SIZE + CELL_GAP) + MONTH_LABEL_HEIGHT + 10;
+        const viewBoxWidth = weeks.length * WEEK_WIDTH + DAY_LABEL_WIDTH + 10;
+        const viewBoxHeight = 7 * (CELL_SIZE + CELL_GAP) + MONTH_LABEL_HEIGHT + 5;
 
         const dayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
@@ -241,22 +291,30 @@ export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
         // Generate month label elements
         let monthLabelElements = '';
         monthLabels.forEach(function(item) {
-          monthLabelElements += '<text class="month-label" x="' + item.x + '" y="12">' + item.month + '</text>';
+          monthLabelElements += '<text class="month-label" x="' + item.x + '" y="10">' + item.month + '</text>';
         });
 
         // Generate day label elements
         let dayLabelElements = '';
         dayLabels.forEach(function(label, index) {
-          const y = MONTH_LABEL_HEIGHT + index * (CELL_SIZE + CELL_GAP) + 9;
+          const y = MONTH_LABEL_HEIGHT + index * (CELL_SIZE + CELL_GAP) + 8;
           dayLabelElements += '<text class="day-label" x="0" y="' + y + '">' + label + '</text>';
         });
 
-        return '<svg width="' + svgWidth + '" height="' + svgHeight + '" viewBox="0 0 ' + svgWidth + ' ' + svgHeight + '">' +
+        // Use 100% width to fill container, viewBox controls the aspect ratio
+        return '<svg class="contribution-svg" viewBox="0 0 ' + viewBoxWidth + ' ' + viewBoxHeight + '" preserveAspectRatio="xMinYMin meet">' +
           monthLabelElements +
           dayLabelElements +
           cells +
         '</svg>';
       }
+
+      // Toggle year section collapse/expand
+      window.toggleYear = function(header) {
+        const section = header.parentElement;
+        section.classList.toggle('collapsed');
+        setTimeout(notifyResize, 300);
+      };
 
       function getContributionColor(level) {
         const colors = {
