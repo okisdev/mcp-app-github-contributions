@@ -223,22 +223,65 @@ export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
         return html;
       }
 
+      // Parse date string as local date (avoid timezone issues)
+      function parseLocalDate(dateStr) {
+        const parts = dateStr.split('-');
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+
       function groupWeeksByYear(weeks) {
         if (!weeks || weeks.length === 0) return {};
 
-        const yearGroups = {};
-
+        // First, flatten all days and filter by year
+        const allDays = [];
         weeks.forEach(function(week) {
-          if (!week.contributionDays || week.contributionDays.length === 0) return;
+          if (!week.contributionDays) return;
+          week.contributionDays.forEach(function(day) {
+            allDays.push(day);
+          });
+        });
 
-          // Use the first day of the week to determine the year
-          const firstDay = week.contributionDays[0];
-          const year = new Date(firstDay.date).getFullYear().toString();
-
-          if (!yearGroups[year]) {
-            yearGroups[year] = { weeks: [] };
+        // Group days by year
+        const daysByYear = {};
+        allDays.forEach(function(day) {
+          const year = parseLocalDate(day.date).getFullYear().toString();
+          if (!daysByYear[year]) {
+            daysByYear[year] = [];
           }
-          yearGroups[year].weeks.push(week);
+          daysByYear[year].push(day);
+        });
+
+        // For each year, reorganize into calendar weeks (Sunday = start of week)
+        const yearGroups = {};
+        Object.keys(daysByYear).forEach(function(year) {
+          const days = daysByYear[year];
+          // Sort by date
+          days.sort(function(a, b) {
+            return parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime();
+          });
+
+          const calendarWeeks = [];
+          let currentWeek = [];
+
+          days.forEach(function(day) {
+            const date = parseLocalDate(day.date);
+            const dayOfWeek = date.getDay();
+
+            // If it's Sunday and we have days in current week, start a new week
+            if (dayOfWeek === 0 && currentWeek.length > 0) {
+              calendarWeeks.push({ contributionDays: currentWeek });
+              currentWeek = [];
+            }
+
+            currentWeek.push(day);
+          });
+
+          // Don't forget the last week
+          if (currentWeek.length > 0) {
+            calendarWeeks.push({ contributionDays: currentWeek });
+          }
+
+          yearGroups[year] = { weeks: calendarWeeks };
         });
 
         return yearGroups;
@@ -265,7 +308,7 @@ export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
         weeks.forEach(function(week, weekIndex) {
           if (week.contributionDays && week.contributionDays.length > 0) {
             const firstDay = week.contributionDays[0];
-            const date = new Date(firstDay.date);
+            const date = parseLocalDate(firstDay.date);
             const month = date.toLocaleDateString('en-US', { month: 'short' });
 
             if (month !== currentMonth) {
@@ -279,9 +322,11 @@ export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
         let cells = '';
         weeks.forEach(function(week, weekIndex) {
           if (!week.contributionDays) return;
-          week.contributionDays.forEach(function(day, dayIndex) {
+          week.contributionDays.forEach(function(day) {
+            const date = parseLocalDate(day.date);
+            const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
             const x = DAY_LABEL_WIDTH + weekIndex * WEEK_WIDTH;
-            const y = MONTH_LABEL_HEIGHT + dayIndex * (CELL_SIZE + CELL_GAP);
+            const y = MONTH_LABEL_HEIGHT + dayOfWeek * (CELL_SIZE + CELL_GAP);
             const color = getContributionColor(day.level);
 
             cells += '<rect class="contribution-cell" x="' + x + '" y="' + y + '" width="' + CELL_SIZE + '" height="' + CELL_SIZE + '" fill="' + color + '" data-date="' + day.date + '" data-count="' + day.count + '" />';
@@ -333,7 +378,7 @@ export function generateAppHtml(options: GenerateAppHtmlOptions = {}): string {
           cell.addEventListener('mouseenter', function(e) {
             const date = cell.getAttribute('data-date');
             const count = cell.getAttribute('data-count');
-            const formattedDate = new Date(date).toLocaleDateString('en-US', {
+            const formattedDate = parseLocalDate(date).toLocaleDateString('en-US', {
               weekday: 'short',
               month: 'short',
               day: 'numeric',
